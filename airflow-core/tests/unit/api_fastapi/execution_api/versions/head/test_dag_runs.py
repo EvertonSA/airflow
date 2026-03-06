@@ -570,3 +570,91 @@ class TestGetPreviousDagRun:
         )
 
         assert response.status_code == 422
+
+
+class TestGetDagRuns:
+    def setup_method(self):
+        clear_db_runs()
+
+    def teardown_method(self):
+        clear_db_runs()
+
+    def test_get_dag_runs_basic(self, client, session, dag_maker):
+        with dag_maker("test_dag_1"):
+            pass
+        dag_maker.create_dagrun(run_id="run1", logical_date=timezone.datetime(2025, 1, 1))
+        
+        with dag_maker("test_dag_2"):
+            pass
+        dag_maker.create_dagrun(run_id="run2", logical_date=timezone.datetime(2025, 1, 2))
+        session.commit()
+
+        response = client.get("/execution/dag-runs")
+        assert response.status_code == 200
+        result = response.json()
+        assert len(result) == 2
+
+    def test_get_dag_runs_filter_dag_ids(self, client, session, dag_maker):
+        with dag_maker("test_dag_1"):
+            pass
+        dag_maker.create_dagrun(run_id="run1")
+        
+        with dag_maker("test_dag_2"):
+            pass
+        dag_maker.create_dagrun(run_id="run2")
+        session.commit()
+
+        response = client.get("/execution/dag-runs", params={"dag_ids": ["test_dag_1"]})
+        assert response.status_code == 200
+        result = response.json()
+        assert len(result) == 1
+        assert result[0]["dag_id"] == "test_dag_1"
+
+    def test_get_dag_runs_filter_logical_dates(self, client, session, dag_maker):
+        with dag_maker("test_dag"):
+            pass
+        dag_maker.create_dagrun(run_id="run_past", logical_date=timezone.datetime(2024, 1, 1))
+        dag_maker.create_dagrun(run_id="run_now", logical_date=timezone.datetime(2025, 1, 1))
+        dag_maker.create_dagrun(run_id="run_future", logical_date=timezone.datetime(2026, 1, 1))
+        session.commit()
+
+        response = client.get(
+            "/execution/dag-runs", 
+            params={
+                "logical_start_date": timezone.datetime(2024, 12, 31).isoformat(),
+                "logical_end_date": timezone.datetime(2025, 12, 31).isoformat()
+            }
+        )
+        assert response.status_code == 200
+        result = response.json()
+        assert len(result) == 1
+        assert result[0]["run_id"] == "run_now"
+
+    def test_get_dag_runs_filter_state_and_trigger(self, client, session, dag_maker):
+        with dag_maker("test_dag"):
+            pass
+        dag_maker.create_dagrun(run_id="run1", state=DagRunState.SUCCESS, run_type=DagRunType.MANUAL)
+        dag_maker.create_dagrun(run_id="run2", state=DagRunState.FAILED, run_type=DagRunType.MANUAL)
+        dag_maker.create_dagrun(run_id="run3", state=DagRunState.SUCCESS, run_type=DagRunType.SCHEDULED)
+        
+        # Backfill
+        dag_maker.create_dagrun(run_id="run4", state=DagRunState.SUCCESS, run_type=DagRunType.BACKFILL_JOB)
+        session.commit()
+
+        # filter state + external_trigger (manual)
+        response = client.get(
+            "/execution/dag-runs", 
+            params={"states": [State.SUCCESS], "external_trigger": True}
+        )
+        assert response.status_code == 200
+        result = response.json()
+        assert len(result) == 1
+        assert result[0]["run_id"] == "run1"
+        
+        # filter no_backfills
+        response = client.get("/execution/dag-runs", params={"no_backfills": True})
+        assert response.status_code == 200
+        result = response.json()
+        # Should exclude 'run4'
+        assert len(result) == 3
+        assert "run4" not in [r["run_id"] for r in result]

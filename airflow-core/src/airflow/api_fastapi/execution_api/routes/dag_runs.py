@@ -255,3 +255,41 @@ def get_previous_dagrun(
     if not (dag_run := session.scalar(stmt)):
         return None
     return DagRun.model_validate(dag_run)
+
+
+@router.get("", status_code=status.HTTP_200_OK)
+def get_dag_runs(
+    session: SessionDep,
+    dag_ids: Annotated[list[str] | None, Query()] = None,
+    run_ids: Annotated[list[str] | None, Query()] = None,
+    logical_dates: Annotated[list[UtcDateTime] | None, Query()] = None,
+    logical_start_date: UtcDateTime | None = None,
+    logical_end_date: UtcDateTime | None = None,
+    states: Annotated[list[str] | None, Query()] = None,
+    external_trigger: bool | None = None,
+    no_backfills: bool = False,
+) -> list[DagRun]:
+    """Get a list of Dag runs matching the given criteria."""
+    stmt = select(DagRunModel)
+    if dag_ids:
+        stmt = stmt.where(DagRunModel.dag_id.in_(dag_ids))
+    if run_ids:
+        stmt = stmt.where(DagRunModel.run_id.in_(run_ids))
+    if logical_dates:
+        stmt = stmt.where(DagRunModel.logical_date.in_(logical_dates))
+    if logical_start_date:
+        stmt = stmt.where(DagRunModel.logical_date >= logical_start_date)
+    if logical_end_date:
+        stmt = stmt.where(DagRunModel.logical_date <= logical_end_date)
+    if states:
+        stmt = stmt.where(DagRunModel.state.in_(states))
+    if external_trigger is not None:
+        if external_trigger:
+            stmt = stmt.where(DagRunModel.run_type == DagRunType.MANUAL)
+        else:
+            stmt = stmt.where(DagRunModel.run_type != DagRunType.MANUAL)
+    if no_backfills:
+        stmt = stmt.where(DagRunModel.run_type != DagRunType.BACKFILL_JOB)
+
+    dag_runs = session.scalars(stmt).all()
+    return [DagRun.model_validate(dr) for dr in dag_runs]

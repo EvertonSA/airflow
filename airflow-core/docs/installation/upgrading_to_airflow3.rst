@@ -147,6 +147,8 @@ code import Airflow components correctly in Airflow 3. The older paths are depre
      - ``airflow.sdk.teardown``
    * - ``airflow.models.dag.DAG``
      - ``airflow.sdk.DAG``
+   * - ``airflow.models.dagrun.DagRun``
+     - ``airflow.sdk.DagRun``
    * - ``airflow.models.baseoperator.BaseOperator``
      - ``airflow.sdk.BaseOperator``
    * - ``airflow.models.param.Param``
@@ -202,10 +204,36 @@ You can follow examples in https://github.com/apache/airflow/issues/49187 to lea
 
 If you have custom operators or task code that previously accessed the metadata database directly, you must migrate to one of the following approaches:
 
-Recommended Approach: Use Airflow Python Client
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Recommended Approach: Use Task SDK Abstractions (when available)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Use the official `Airflow Python Client <https://github.com/apache/airflow-client-python>`_ to interact with
+Many core database-backed objects have been abstracted into the Task SDK, routing queries through the internal API securely without requiring database credentials.
+For instance, if your code used ``DagRun.find()`` to query DagRuns:
+
+.. code-block:: python
+
+   # Older Airflow 2 code
+   from airflow.models.dagrun import DagRun
+   runs = DagRun.find(dag_id="my_dag_id", state="success")
+
+You can seamlessly migrate this by importing the abstracted ``DagRun`` from the Task SDK:
+
+.. code-block:: python
+
+   # Airflow 3 Code
+   from airflow.sdk import DagRun
+
+   @task
+   def my_task():
+       runs = DagRun.find(dag_id="my_dag_id", state="success")
+       print(f"Found {len(runs)} specific successful runs.")
+
+The Task SDK will handle communicating with the Execution API server to retrieve the records.
+
+Recommended Approach: Use Airflow Python Client (Fallback)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If a specific model or query hasn't been abstracted into the Task SDK yet, use the official `Airflow Python Client <https://github.com/apache/airflow-client-python>`_ to interact with
 Airflow metadata database via REST API. The Python Client has APIs defined for most use cases, including DagRuns,
 TaskInstances, Variables, Connections, XComs, and more.
 

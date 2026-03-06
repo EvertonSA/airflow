@@ -559,6 +559,11 @@ class DagRunResult(DagRun):
         return cls(**dr_response.model_dump(exclude_defaults=True), type="DagRunResult")
 
 
+class DagRunListResult(BaseModel):
+    dag_runs: list[DagRun]
+    type: Literal["DagRunListResult"] = "DagRunListResult"
+
+
 class DagRunStateResult(DagRunStateResponse):
     type: Literal["DagRunStateResult"] = "DagRunStateResult"
 
@@ -719,7 +724,8 @@ ToTask = Annotated[
     | CreateHITLDetailPayload
     | HITLDetailRequestResult
     | OKResponse
-    | PreviousDagRunResult,
+    | PreviousDagRunResult
+    | DagRunListResult,
     Field(discriminator="type"),
 ]
 
@@ -889,6 +895,18 @@ class GetDagRun(BaseModel):
     type: Literal["GetDagRun"] = "GetDagRun"
 
 
+class GetDagRuns(BaseModel):
+    dag_ids: list[str] | None = None
+    run_ids: list[str] | None = None
+    logical_dates: list[AwareDatetime] | None = None
+    logical_start_date: AwareDatetime | None = None
+    logical_end_date: AwareDatetime | None = None
+    states: list[str] | None = None
+    external_trigger: bool | None = None
+    no_backfills: bool = False
+    type: Literal["GetDagRuns"] = "GetDagRuns"
+
+
 class GetDagRunState(BaseModel):
     dag_id: str
     run_id: str
@@ -1027,6 +1045,7 @@ ToSupervisor = Annotated[
     | GetAssetEventByAssetAlias
     | GetConnection
     | GetDagRun
+    | GetDagRuns
     | GetDagRunState
     | GetDRCount
     | GetPrevSuccessfulDagRun

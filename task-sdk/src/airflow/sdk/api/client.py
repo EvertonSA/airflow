@@ -729,6 +729,46 @@ class DagRunOperations:
         resp = self.client.get(f"dag-runs/{dag_id}/{run_id}")
         return DagRun.model_validate_json(resp.read())
 
+    def get_dag_runs(
+        self,
+        dag_ids: list[str] | None = None,
+        run_ids: list[str] | None = None,
+        logical_dates: list[datetime] | None = None,
+        logical_start_date: datetime | None = None,
+        logical_end_date: datetime | None = None,
+        states: list[str] | None = None,
+        external_trigger: bool | None = None,
+        no_backfills: bool = False,
+    ) -> list[DagRun]:
+        """Get a list of dag runs."""
+        params: dict[str, Any] = {}
+        if dag_ids:
+            params["dag_ids"] = dag_ids
+        if run_ids:
+            params["run_ids"] = run_ids
+        if logical_dates:
+            params["logical_dates"] = [d.isoformat() for d in logical_dates]
+        if logical_start_date:
+            params["logical_start_date"] = logical_start_date.isoformat()
+        if logical_end_date:
+            params["logical_end_date"] = logical_end_date.isoformat()
+        if states:
+            params["states"] = states
+        if external_trigger is not None:
+            params["external_trigger"] = external_trigger
+        if no_backfills:
+            params["no_backfills"] = no_backfills
+            
+        resp = self.client.get("dag-runs", params=params)
+        
+        # We expect a list of DagRuns
+        if resp.status_code == 200:
+            from pydantic import TypeAdapter
+            from airflow.sdk.api.datamodels._generated import DagRun
+            adapter = TypeAdapter(list[DagRun])
+            return adapter.validate_json(resp.read())
+        return []
+
     def get_state(self, dag_id: str, run_id: str) -> DagRunStateResponse:
         """Get the state of a Dag run via the API server."""
         resp = self.client.get(f"dag-runs/{dag_id}/{run_id}/state")
