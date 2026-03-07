@@ -1272,6 +1272,54 @@ class TestDagRunOperations:
 
         assert result == DagRunStateResponse(state=DagRunState.RUNNING)
 
+    def test_get_dag_runs(self):
+        """Test that the client can get a list of dag runs with correctly mapped query params."""
+        logical_date1 = datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        logical_date2 = datetime(2024, 1, 16, 12, 0, 0, tzinfo=timezone.utc)
+
+        def handle_request(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/dag-runs":
+                assert request.url.params.get_list("dag_ids") == ["test_dag_1", "test_dag_2"]
+                assert request.url.params.get_list("run_ids") == ["run1", "run2"]
+                assert request.url.params.get_list("logical_dates") == [logical_date1.isoformat(), logical_date2.isoformat()]
+                assert request.url.params.get_list("states") == ["success", "failed"]
+                assert request.url.params.get("limit") == "50"
+                assert request.url.params.get("external_trigger") == "true"
+                assert request.url.params.get("no_backfills") == "true"
+
+                return httpx.Response(
+                    status_code=200,
+                    json=[
+                        {
+                            "dag_id": "test_dag_1",
+                            "run_id": "run1",
+                            "logical_date": logical_date1.isoformat(),
+                            "start_date": "2024-01-14T12:05:00+00:00",
+                            "run_after": "2024-01-14T12:00:00+00:00",
+                            "run_type": "scheduled",
+                            "state": "success",
+                            "consumed_asset_events": [],
+                        }
+                    ],
+                )
+            return httpx.Response(status_code=422)
+
+        client = make_client(transport=httpx.MockTransport(handle_request))
+        result = client.dag_runs.get_dag_runs(
+            dag_ids=["test_dag_1", "test_dag_2"],
+            run_ids=["run1", "run2"],
+            logical_dates=[logical_date1, logical_date2],
+            states=["success", "failed"],
+            external_trigger=True,
+            no_backfills=True,
+            limit=50,
+        )
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].dag_id == "test_dag_1"
+        assert result[0].run_id == "run1"
+
     def test_get_count_basic(self):
         def handle_request(request: httpx.Request) -> httpx.Response:
             if request.url.path == "/dag-runs/count":

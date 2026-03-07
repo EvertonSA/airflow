@@ -658,3 +658,26 @@ class TestGetDagRuns:
         # Should exclude 'run4'
         assert len(result) == 3
         assert "run4" not in [r["run_id"] for r in result]
+
+    def test_get_dag_runs_limit_and_order(self, client, session, dag_maker):
+        with dag_maker("test_dag"):
+            pass
+        dag_maker.create_dagrun(run_id="run1", logical_date=timezone.datetime(2025, 1, 1))
+        dag_maker.create_dagrun(run_id="run2", logical_date=timezone.datetime(2025, 1, 3))
+        dag_maker.create_dagrun(run_id="run3", logical_date=timezone.datetime(2025, 1, 2))
+        session.commit()
+
+        # Test limit=1 (should return the most recent run: 'run2')
+        response = client.get("/execution/dag-runs", params={"limit": 1})
+        assert response.status_code == 200
+        result = response.json()
+        assert len(result) == 1
+        assert result[0]["run_id"] == "run2"
+
+        # Test limit=2 (should return the 2 most recent runs, ordered desc: 'run2', 'run3')
+        response = client.get("/execution/dag-runs", params={"limit": 2})
+        assert response.status_code == 200
+        result = response.json()
+        assert len(result) == 2
+        assert result[0]["run_id"] == "run2"
+        assert result[1]["run_id"] == "run3"

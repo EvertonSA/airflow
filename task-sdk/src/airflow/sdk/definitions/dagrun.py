@@ -39,6 +39,7 @@ class DagRun:
         state: str | Iterable[str] | None = None,
         external_trigger: bool | None = None,
         no_backfills: bool = False,
+        limit: int = 30,
         execution_start_date: datetime | None = None,
         execution_end_date: datetime | None = None,
     ) -> list[DagRunResponse]:
@@ -68,6 +69,7 @@ class DagRun:
             states=list(state) if state else None,
             external_trigger=external_trigger,
             no_backfills=no_backfills,
+            limit=limit,
             logical_start_date=execution_start_date,
             logical_end_date=execution_end_date,
         )

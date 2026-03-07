@@ -66,6 +66,7 @@ class TestDagRun:
             state="success",
             external_trigger=True,
             no_backfills=True,
+            limit=50,
         )
 
         assert len(sent_messages) == 1
@@ -77,6 +78,7 @@ class TestDagRun:
         assert msg.states == ["success"]
         assert msg.external_trigger is True
         assert msg.no_backfills is True
+        assert msg.limit == 50
         
         assert len(runs) == 1
         assert runs[0].dag_id == "test_dag"

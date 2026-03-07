@@ -904,6 +904,7 @@ class GetDagRuns(BaseModel):
     states: list[str] | None = None
     external_trigger: bool | None = None
     no_backfills: bool = False
+    limit: int = 30
     type: Literal["GetDagRuns"] = "GetDagRuns"
 
 

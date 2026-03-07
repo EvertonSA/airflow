@@ -1410,6 +1410,7 @@ class ActivitySubprocess(WatchedSubprocess):
                 states=msg.states,
                 external_trigger=msg.external_trigger,
                 no_backfills=msg.no_backfills,
+                limit=msg.limit,
             ))
         elif isinstance(msg, GetDagRunState):
             dr_resp = self.client.dag_runs.get_state(msg.dag_id, msg.run_id)

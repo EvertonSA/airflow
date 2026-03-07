@@ -268,6 +268,7 @@ def get_dag_runs(
     states: Annotated[list[str] | None, Query()] = None,
     external_trigger: bool | None = None,
     no_backfills: bool = False,
+    limit: Annotated[int, Query(ge=1)] = 30,
 ) -> list[DagRun]:
     """Get a list of Dag runs matching the given criteria."""
     stmt = select(DagRunModel)
@@ -290,6 +291,8 @@ def get_dag_runs(
             stmt = stmt.where(DagRunModel.run_type != DagRunType.MANUAL)
     if no_backfills:
         stmt = stmt.where(DagRunModel.run_type != DagRunType.BACKFILL_JOB)
+        
+    stmt = stmt.order_by(DagRunModel.logical_date.desc()).limit(limit)
 
     dag_runs = session.scalars(stmt).all()
     return [DagRun.model_validate(dr) for dr in dag_runs]

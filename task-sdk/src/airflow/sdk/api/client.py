@@ -739,9 +739,10 @@ class DagRunOperations:
         states: list[str] | None = None,
         external_trigger: bool | None = None,
         no_backfills: bool = False,
+        limit: int = 30,
     ) -> list[DagRun]:
         """Get a list of dag runs."""
-        params: dict[str, Any] = {}
+        params: dict[str, Any] = {"limit": limit}
         if dag_ids:
             params["dag_ids"] = dag_ids
         if run_ids:
